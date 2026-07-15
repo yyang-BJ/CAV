@@ -1,0 +1,24 @@
+name: cav-rl
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch
+  - pytorch-cuda=12.1
+  - pip:
+      - -e .
+      - transformers>=4.44.0
+      - accelerate>=0.33.0
+      - datasets>=2.20.0
+      - peft>=0.12.0
+      - pyyaml>=6.0.1
+      - tqdm>=4.66.0
+      - ray>=2.10.0
+      - hydra-core>=1.3.2
+      - omegaconf>=2.3.0
+      - pandas>=2.0.0
+      - pyarrow>=14.0.0
+      - vllm>=0.6.0

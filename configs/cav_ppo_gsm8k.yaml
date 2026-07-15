@@ -1,0 +1,68 @@
+model_name_or_path: Qwen/Qwen2.5-3B-Instruct
+sft_adapter_or_model:
+critic_model_name_or_path: Qwen/Qwen2.5-3B-Instruct
+dataset_name: openai/gsm8k
+dataset_config: main
+output_dir: outputs/cav-ppo-qwen2.5-3b-gsm8k
+
+seed: 42
+max_prompt_length: 1024
+max_completion_length: 768
+max_train_samples:
+max_eval_samples: 256
+
+budget_actions: [0, 16, 32, 64, 128]
+max_macro_steps: 6
+rollout_batch_size: 4
+ppo_epochs: 2
+mini_batch_size: 1
+num_iterations: 1000
+actor_learning_rate: 1.0e-6
+critic_learning_rate: 1.0e-5
+weight_decay: 0.0
+clip_range: 0.2
+value_coef: 1.0
+kl_coef: 0.01
+entropy_coef: 0.0
+max_grad_norm: 1.0
+gamma: 1.0
+gae_lambda: 0.95
+
+generation:
+  temperature: 1.0
+  top_p: 0.95
+  do_sample: true
+
+reward:
+  correct_reward: 1.0
+  wrong_reward: 0.0
+  computation_price: 0.0005
+  actual_token_price: 0.0001
+  format_penalty: 0.1
+  missing_stop_penalty: 0.2
+  invalid_budget_penalty: 0.1
+  overflow_budget_penalty: 0.05
+  target_expected_budget: 128.0
+  dual_lr: 0.01
+  initial_lambda_c: 0.0005
+  min_lambda_c: 0.0
+  max_lambda_c: 0.02
+
+critic:
+  pooling: last_token
+  use_bootstrap_targets: true
+
+lora:
+  enabled: true
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+

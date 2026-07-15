@@ -1,0 +1,22 @@
+# This file documents the CAV-specific Hydra overrides used with veRL's
+# ppo_trainer config. The launch script passes these values on the CLI so they
+# can be layered on top of either upstream veRL, T3, or EnvRL forks.
+
+cav:
+  budget_actions: [0, 16, 32, 64, 128]
+  correct_reward: 1.0
+  wrong_reward: 0.0
+  computation_price: 0.0005
+  actual_token_price: 0.0001
+  format_penalty: 0.1
+  missing_stop_penalty: 0.2
+  invalid_budget_penalty: 0.1
+  target_expected_budget: 128.0
+  lambda_c: 0.0005
+
+algorithm:
+  adv_estimator: cav_gae
+  gamma: 1.0
+  lam: 0.95
+  use_kl_in_reward: false
+
