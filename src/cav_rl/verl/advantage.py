@@ -20,26 +20,102 @@ def compute_cav_gae_advantage_return(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """veRL custom estimator for CAV.
 
-    This estimator is intentionally token-shaped so it can flow through the
-    standard veRL actor loss. Budget tokens get allocation-level CAV/GAE credit,
-    while reason/answer tokens get executor-level return credit. If a standard
-    critic value tensor is present in kwargs/config plumbing, it is used as the
-    baseline; otherwise it falls back to reward-to-go, which is useful for early
-    debugging or critic-free ablations.
+    CAV decisions are macro-step actions, so rewards and advantages are first
+    aggregated by macro_id. The resulting A_k^GAE is then broadcast back to all
+    budget/reason/answer tokens that belong to that macro step, preserving the
+    tensor shape expected by veRL's standard actor and critic losses.
     """
     gamma = float(getattr(config, "gamma", 1.0)) if config is not None else 1.0
     lam = float(getattr(config, "lam", 0.95)) if config is not None else 0.95
     values = kwargs.get("values")
     budget_mask = kwargs.get("cav_budget_mask")
     executor_mask = kwargs.get("cav_executor_mask")
+    reason_mask = kwargs.get("cav_reason_mask")
+    macro_ids = kwargs.get("cav_macro_ids")
 
     if budget_mask is None:
         budget_mask = response_mask
     if executor_mask is None:
         executor_mask = response_mask - budget_mask
+    if reason_mask is None:
+        reason_mask = executor_mask
     if values is None:
         values = torch.zeros_like(token_level_rewards)
 
+    if macro_ids is None:
+        return _token_level_fallback(token_level_rewards, response_mask, values, budget_mask, executor_mask, gamma, lam)
+
+    with torch.no_grad():
+        advantages = torch.zeros_like(token_level_rewards)
+        returns = torch.zeros_like(token_level_rewards)
+
+        for batch_idx in range(token_level_rewards.shape[0]):
+            valid_ids = macro_ids[batch_idx][(response_mask[batch_idx] > 0) & (macro_ids[batch_idx] >= 0)]
+            if valid_ids.numel() == 0:
+                continue
+            macro_count = int(valid_ids.max().item()) + 1
+            macro_rewards = []
+            macro_values = []
+            macro_discounts = []
+            macro_token_masks = []
+
+            for macro_idx in range(macro_count):
+                macro_mask = (macro_ids[batch_idx] == macro_idx) & (response_mask[batch_idx] > 0)
+                if not macro_mask.any():
+                    macro_rewards.append(token_level_rewards.new_tensor(0.0))
+                    macro_values.append(token_level_rewards.new_tensor(0.0))
+                    macro_discounts.append(token_level_rewards.new_tensor(1.0))
+                    macro_token_masks.append(macro_mask)
+                    continue
+
+                reward = token_level_rewards[batch_idx][macro_mask].sum()
+                value_positions = torch.nonzero(
+                    macro_mask & (budget_mask[batch_idx] > 0),
+                    as_tuple=False,
+                ).flatten()
+                if value_positions.numel() == 0:
+                    value_positions = torch.nonzero(macro_mask, as_tuple=False).flatten()
+                value = values[batch_idx, value_positions[0]]
+                duration = int(reason_mask[batch_idx][macro_mask].sum().item())
+                macro_rewards.append(reward)
+                macro_values.append(value)
+                macro_discounts.append(token_level_rewards.new_tensor(gamma ** max(duration, 0)))
+                macro_token_masks.append(macro_mask)
+
+            rewards = torch.stack(macro_rewards)
+            macro_value_tensor = torch.stack(macro_values)
+            discounts = torch.stack(macro_discounts)
+            next_values = torch.cat(
+                [
+                    macro_value_tensor[1:],
+                    torch.zeros(1, device=macro_value_tensor.device, dtype=macro_value_tensor.dtype),
+                ]
+            )
+            deltas = rewards + discounts * next_values - macro_value_tensor
+            macro_adv = torch.zeros_like(deltas)
+            running = torch.zeros((), device=deltas.device, dtype=deltas.dtype)
+            for macro_idx in reversed(range(macro_count)):
+                running = deltas[macro_idx] + discounts[macro_idx] * lam * running
+                macro_adv[macro_idx] = running
+
+            for macro_idx, macro_mask in enumerate(macro_token_masks):
+                if macro_mask.any():
+                    advantages[batch_idx, macro_mask] = macro_adv[macro_idx]
+
+        returns = (advantages + values) * response_mask
+        advantages = _masked_whiten(advantages, response_mask)
+    return advantages, returns
+
+
+def _token_level_fallback(
+    token_level_rewards: torch.Tensor,
+    response_mask: torch.Tensor,
+    values: torch.Tensor,
+    budget_mask: torch.Tensor,
+    executor_mask: torch.Tensor,
+    gamma: float,
+    lam: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.no_grad():
         next_value = torch.zeros(token_level_rewards.shape[0], device=token_level_rewards.device)
         running = torch.zeros_like(next_value)
@@ -92,6 +168,7 @@ def patch_ray_trainer_compute_advantage() -> None:
         num_repeat: int = 1,
         norm_adv_by_std_in_grpo: bool = True,
         config=None,
+        **kwargs,
     ):
         if str(adv_estimator) != "cav_gae":
             return original(
@@ -102,6 +179,7 @@ def patch_ray_trainer_compute_advantage() -> None:
                 num_repeat=num_repeat,
                 norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
                 config=config,
+                **kwargs,
             )
 
         if "response_mask" not in data.batch:
@@ -115,6 +193,8 @@ def patch_ray_trainer_compute_advantage() -> None:
             values=data.batch.get("values"),
             cav_budget_mask=data.batch.get("cav_budget_mask"),
             cav_executor_mask=data.batch.get("cav_executor_mask"),
+            cav_reason_mask=data.batch.get("cav_reason_mask"),
+            cav_macro_ids=data.batch.get("cav_macro_ids"),
             config=config,
         )
         data.batch["advantages"] = advantages

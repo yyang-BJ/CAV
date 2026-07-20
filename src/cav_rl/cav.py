@@ -30,15 +30,15 @@ def attach_cav_targets_and_advantages(
 ) -> None:
     """Compute macro-step CAV/GAE advantages and critic targets.
 
-    Budget fields receive the high-level allocation advantage:
-        delta_k = r_k + gamma * V_high(H_{k+1}) - V_high(H_k)
+    The rollout unit is a macro step. For a positive budget action, the reward
+    is the computation price charged on actual consumed tokens l_k, and the
+    bootstrap discount is gamma ** l_k:
 
-    Reason/answer payload fields receive the low-level executor advantage:
-        delta_low_k = r_k + gamma * V_high(H_{k+1}) - V_low(H_k, b_k)
+        delta_k = r_k + gamma^{l_k} V_high(H_{k+1}) - V_high(H_k)
 
-    This follows the proposal optimization notes: the budget action is credited
-    by the value of the next reasoning state minus the current state value and
-    computation price; the price is already included in r_k.
+    The budget field and the generated payload field share the same macro GAE
+    advantage A_k. V_low(H_k, b_k) is still trained as an executor-state value
+    diagnostic, but it does not create a separate reasoning advantage.
     """
     all_high = [macro.high_prefix for sample in samples for macro in sample.macros]
     all_low = [macro.low_prefix for sample in samples for macro in sample.macros]
@@ -53,18 +53,22 @@ def attach_cav_targets_and_advantages(
         v_high = high_values[cursor : cursor + n]
         v_low = low_values[cursor : cursor + n]
         rewards = torch.tensor([macro.reward for macro in sample.macros], device=v_high.device, dtype=v_high.dtype)
+        discounts = torch.tensor(
+            [gamma ** max(int(macro.duration), 0) for macro in sample.macros],
+            device=v_high.device,
+            dtype=v_high.dtype,
+        )
         next_high = torch.cat([v_high[1:], torch.zeros(1, device=v_high.device, dtype=v_high.dtype)])
 
-        high_deltas = rewards + gamma * next_high - v_high
-        low_deltas = rewards + gamma * next_high - v_low
+        high_deltas = rewards + discounts * next_high - v_high
 
         high_adv = torch.zeros_like(high_deltas)
         running = torch.zeros((), device=v_high.device, dtype=v_high.dtype)
         for t in reversed(range(n)):
-            running = high_deltas[t] + gamma * gae_lambda * running
+            running = high_deltas[t] + discounts[t] * gae_lambda * running
             high_adv[t] = running
 
-        low_adv = low_deltas
+        low_adv = high_adv
         high_targets = high_adv + v_high
         low_targets = low_adv + v_low
 
@@ -79,11 +83,6 @@ def attach_cav_targets_and_advantages(
             if field.macro_index is None or field.macro_index not in macro_by_index:
                 continue
             macro = macro_by_index[field.macro_index]
-            if field.name == "budget":
-                field.advantage = macro.high_advantage
-                field.target = macro.high_target
-            else:
-                field.advantage = macro.low_advantage
-                field.target = macro.low_target
+            field.advantage = macro.high_advantage
+            field.target = macro.high_target
         cursor += n
-

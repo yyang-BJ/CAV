@@ -1,7 +1,10 @@
 model_name_or_path: /home/dataset-assist-0/ZX/models/Qwen2.5-3B-Instruct
 dataset_name: openai/gsm8k
 dataset_config: main
-output_dir: outputs/sft-qwen2.5-3b-cav-gsm8k
+output_dir: outputs/sft-qwen2.5-3b-gsm8k-baseline
+
+# Plain CoT SFT (no CAV tags).
+sft_style: baseline
 
 seed: 42
 max_prompt_length: 1024
@@ -20,13 +23,13 @@ save_steps: 500
 bf16: true
 gradient_checkpointing: true
 
+# Unused for baseline style, kept so SFTConfig remains valid.
 budget_actions: [0, 16, 32, 64, 128]
 sft_reason_budget: 64
-# Keep old config usable but avoid teaching overflow by default.
-sft_fit_budget: true
-sft_direct_answer_prob: 0.1
-sft_multi_macro_prob: 0.15
-sft_format_token_weight: 1.5
+sft_fit_budget: false
+sft_direct_answer_prob: 0.0
+sft_multi_macro_prob: 0.0
+sft_format_token_weight: 1.0
 
 lora:
   enabled: true
@@ -41,4 +44,3 @@ lora:
     - gate_proj
     - up_proj
     - down_proj
-

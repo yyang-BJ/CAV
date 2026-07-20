@@ -13,6 +13,7 @@ from .config import CAVPPOConfig
 from .data import MathExample
 from .logprobs import sum_masked_logprobs, token_logprobs_from_logits
 from .parsing import field_token_mask
+from .rewards import LambdaController
 from .rollout import CAVRolloutSample, attach_old_logprobs, build_rollout_sample
 
 
@@ -108,6 +109,7 @@ def collect_rollouts(
             config.reward,
             lambda_c,
             generation_kwargs,
+            max_macro_steps=config.max_macro_steps,
         )
         for example in batch
     ]
@@ -133,6 +135,7 @@ def ppo_update(
     critic_optimizer,
     config: CAVPPOConfig,
     lambda_c: float,
+    lambda_controller: LambdaController | None = None,
 ) -> PPOStats:
     actor.train()
     critic.train()
@@ -174,13 +177,16 @@ def ppo_update(
     correct = [float(sample.reward.is_correct) for sample in samples]
     budgets = [sample.reward.allocated_budget for sample in samples]
     reason_tokens = [sample.reward.actual_reason_tokens for sample in samples]
+    mean_reason_tokens = sum(reason_tokens) / max(len(reason_tokens), 1)
+    if lambda_controller is not None:
+        lambda_c = lambda_controller.update(mean_reason_tokens)
     return PPOStats(
         actor_loss=sum(actor_losses) / max(len(actor_losses), 1),
         critic_loss=sum(critic_losses) / max(len(critic_losses), 1),
         mean_reward=sum(rewards) / max(len(rewards), 1),
         mean_correct=sum(correct) / max(len(correct), 1),
         mean_budget=sum(budgets) / max(len(budgets), 1),
-        mean_reason_tokens=sum(reason_tokens) / max(len(reason_tokens), 1),
+        mean_reason_tokens=mean_reason_tokens,
         lambda_c=lambda_c,
     )
 
@@ -198,4 +204,3 @@ def save_checkpoint(actor, critic, tokenizer, output_dir: str | Path, step: int)
         path / "critic_value_heads.pt",
     )
     tokenizer.save_pretrained(path / "tokenizer")
-

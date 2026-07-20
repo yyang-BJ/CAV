@@ -1,6 +1,6 @@
 name: cav-rl
 channels:
-  - pytorch
+  - pytorch=2.1.2
   - nvidia
   - conda-forge
 dependencies:
@@ -21,4 +21,4 @@ dependencies:
       - omegaconf>=2.3.0
       - pandas>=2.0.0
       - pyarrow>=14.0.0
-      - vllm>=0.6.0
+      - vllm

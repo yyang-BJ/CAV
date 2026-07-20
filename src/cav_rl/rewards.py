@@ -5,7 +5,11 @@ from decimal import Decimal, InvalidOperation
 import re
 
 from .config import RewardConfig
+from .lambda_dual import DualLambdaConfig, LambdaController
 from .parsing import ParsedCompletion
+
+# Re-export for local PPO / callers that import from rewards.
+__all__ = ["LambdaController", "RewardBreakdown", "compute_reward", "grade_answer"]
 
 
 NUMBER_RE = re.compile(r"-?\d+(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?")
@@ -16,7 +20,6 @@ class RewardBreakdown:
     total: float
     correctness: float
     computation_cost: float
-    actual_token_cost: float
     format_penalty: float
     missing_stop_penalty: float
     invalid_budget_penalty: float
@@ -29,20 +32,22 @@ class RewardBreakdown:
     macro_rewards: list[float]
 
 
-class LambdaController:
-    """Dual variable for the expected computation budget constraint."""
-
-    def __init__(self, config: RewardConfig):
-        self.value = float(config.initial_lambda_c)
-        self.target_expected_budget = float(config.target_expected_budget)
-        self.lr = float(config.dual_lr)
-        self.min_value = float(config.min_lambda_c)
-        self.max_value = float(config.max_lambda_c)
-
-    def update(self, observed_budget: float) -> float:
-        self.value += self.lr * (observed_budget - self.target_expected_budget)
-        self.value = min(max(self.value, self.min_value), self.max_value)
-        return self.value
+def build_lambda_controller(config: RewardConfig, total_training_steps: int = 100) -> LambdaController:
+    return LambdaController(
+        DualLambdaConfig(
+            initial_lambda_c=config.initial_lambda_c,
+            target_expected_tokens=config.target_expected_tokens,
+            dual_lr=config.dual_lr,
+            min_lambda_c=config.min_lambda_c,
+            max_lambda_c=config.max_lambda_c,
+            enabled=True,
+            b_start=getattr(config, "b_start", None),
+            b_anneal_ratio=float(getattr(config, "b_anneal_ratio", 0.7)),
+            lambda_scale_start_ratio=float(getattr(config, "lambda_scale_start_ratio", 0.1)),
+            lambda_scale_end_ratio=float(getattr(config, "lambda_scale_end_ratio", 0.4)),
+            total_training_steps=int(total_training_steps),
+        )
+    )
 
 
 def _last_number(text: str | None) -> str | None:
@@ -73,13 +78,22 @@ def compute_reward(
     config: RewardConfig,
     lambda_c: float,
 ) -> RewardBreakdown:
+    """Main term: R' = R_answer / (1 + λ C) with C = Σ reason tokens."""
     is_correct = grade_answer(parsed.answer, gold_answer)
-    correctness = config.correct_reward if is_correct else config.wrong_reward
+    grant_correctness = parsed.valid_format or not getattr(
+        config, "correctness_requires_valid_format", True
+    )
+    if grant_correctness and is_correct:
+        answer_reward = config.correct_reward
+    else:
+        answer_reward = config.wrong_reward
     allocated_budget = parsed.total_allocated_budget
     actual_reason_tokens = sum(decision.reason_token_count for decision in parsed.decisions)
-    computation_cost = lambda_c * allocated_budget
-    actual_token_cost = config.actual_token_price * actual_reason_tokens
-    format_penalty = 0.0 if parsed.valid_format else config.format_penalty
+    cost_factor = max(0.0, float(lambda_c)) * max(0, int(actual_reason_tokens))
+    gated = float(answer_reward) / (1.0 + cost_factor)
+    # Keep field as λC for logging; the applied main reward is ``gated``.
+    computation_cost = cost_factor
+    format_penalty = 0.0 if parsed.valid_format else config.format_invalid_penalty()
     missing_stop_penalty = 0.0 if parsed.has_stop else config.missing_stop_penalty
     invalid_budget_count = sum(1 for err in parsed.errors if "not in allowed set" in err)
     overflow_count = sum(1 for decision in parsed.decisions if decision.overflow)
@@ -90,12 +104,10 @@ def compute_reward(
     for decision in parsed.decisions:
         reward = 0.0
         if decision.budget > 0:
-            reward -= lambda_c * decision.budget
-            reward -= config.actual_token_price * decision.reason_token_count
             if decision.overflow:
                 reward -= config.overflow_budget_penalty
         else:
-            reward += correctness
+            reward += gated
         macro_rewards.append(reward)
 
     if macro_rewards:
@@ -104,9 +116,7 @@ def compute_reward(
         macro_rewards.append(-(format_penalty + missing_stop_penalty + invalid_budget_penalty))
 
     total = (
-        correctness
-        - computation_cost
-        - actual_token_cost
+        gated
         - format_penalty
         - missing_stop_penalty
         - invalid_budget_penalty
@@ -114,9 +124,8 @@ def compute_reward(
     )
     return RewardBreakdown(
         total=total,
-        correctness=correctness,
+        correctness=gated,
         computation_cost=computation_cost,
-        actual_token_cost=actual_token_cost,
         format_penalty=format_penalty,
         missing_stop_penalty=missing_stop_penalty,
         invalid_budget_penalty=invalid_budget_penalty,
@@ -128,4 +137,3 @@ def compute_reward(
         gold_answer=gold_answer,
         macro_rewards=macro_rewards,
     )
-

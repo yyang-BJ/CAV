@@ -1,0 +1,26 @@
+# Plain GRPO baseline overrides (outcome reward, group-relative advantage, no critic).
+
+baseline:
+  correct_reward: 1.0
+  wrong_reward: 0.0
+  format_score: 0.0
+  extract_method: flexible
+
+cav:
+  hierarchical_rollout: false
+
+algorithm:
+  adv_estimator: grpo
+  use_kl_in_reward: false
+  norm_adv_by_std_in_grpo: true
+
+critic:
+  enable: false
+
+actor_rollout_ref:
+  actor:
+    use_kl_loss: true
+    kl_loss_coef: 0.001
+    kl_loss_type: low_var_kl
+  rollout:
+    n: 4

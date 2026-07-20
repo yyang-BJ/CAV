@@ -1,0 +1,36 @@
+# GRPO-correct: correctness + #### format bonus + floor-gated length rank.
+
+grpo_correct:
+  correct_reward: 1.0
+  wrong_reward: -0.5
+  unparsable_reward: -1.0
+  strict_format_bonus: 0.2
+  missing_format_penalty: -0.2
+  length_bonus_weight: 0.01
+  length_floor: 270.0
+  length_floor_softness: 40.0
+  length_excess_ref: 0.0
+  length_score_max: 1.0
+  length_score_min: 0.0
+  length_score_neutral: 0.0
+  min_correct_for_length_ranking: 2
+  extract_method: flexible
+
+cav:
+  hierarchical_rollout: false
+
+algorithm:
+  adv_estimator: grpo
+  use_kl_in_reward: false
+  norm_adv_by_std_in_grpo: true
+
+critic:
+  enable: false
+
+actor_rollout_ref:
+  actor:
+    use_kl_loss: true
+    kl_loss_coef: 0.03
+    kl_loss_type: low_var_kl
+  rollout:
+    n: 4

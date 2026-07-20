@@ -27,17 +27,27 @@ class GenerationConfigData:
 class RewardConfig:
     correct_reward: float = 1.0
     wrong_reward: float = 0.0
-    computation_price: float = 0.0005
-    actual_token_price: float = 0.0001
-    format_penalty: float = 0.1
+    format_penalty: float = 0.5
+    invalid_action_penalty: float | None = 0.5
     missing_stop_penalty: float = 0.2
     invalid_budget_penalty: float = 0.1
     overflow_budget_penalty: float = 0.05
-    target_expected_budget: float = 128.0
+    correctness_requires_valid_format: bool = True
+    target_expected_tokens: float = 128.0
     dual_lr: float = 0.01
     initial_lambda_c: float = 0.0005
     min_lambda_c: float = 0.0
     max_lambda_c: float = 0.02
+    # Optional curriculum (ratios of total PPO steps). Used by local PPO / DualLambdaConfig.
+    b_start: float | None = None
+    b_anneal_ratio: float = 0.7
+    lambda_scale_start_ratio: float = 0.1
+    lambda_scale_end_ratio: float = 0.4
+
+    def format_invalid_penalty(self) -> float:
+        if self.invalid_action_penalty is not None:
+            return float(self.invalid_action_penalty)
+        return float(self.format_penalty)
 
 
 @dataclass
@@ -68,7 +78,14 @@ class SFTConfig:
     bf16: bool = True
     gradient_checkpointing: bool = True
     budget_actions: list[int] = field(default_factory=lambda: [0, 16, 32, 64, 128])
-    sft_reason_budget: int = 64
+    sft_reason_budget: int | None = 64
+    # Format-strengthened SFT options
+    sft_fit_budget: bool = True
+    sft_direct_answer_prob: float = 0.15
+    sft_multi_macro_prob: float = 0.25
+    sft_format_token_weight: float = 2.0
+    # "cav" (budget tags) or "baseline" (plain CoT + ####)
+    sft_style: str = "cav"
     lora: LoraConfigData = field(default_factory=LoraConfigData)
 
 
@@ -132,4 +149,3 @@ def load_cav_ppo_config(path: str | Path) -> CAVPPOConfig:
     data["critic"] = _nested(CriticConfig, data.get("critic"))
     data["lora"] = _nested(LoraConfigData, data.get("lora"))
     return CAVPPOConfig(**_strip_none(data))
-

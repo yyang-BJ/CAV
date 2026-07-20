@@ -10,6 +10,7 @@ from cav_rl.parsing import FieldSpan, parse_completion
 @dataclass
 class CAVMaskResult:
     budget_mask: torch.Tensor
+    reason_mask: torch.Tensor
     executor_mask: torch.Tensor
     macro_ids: torch.Tensor
     budget_values: torch.Tensor
@@ -30,6 +31,22 @@ def _char_to_token_mask(tokenizer, text: str, span: FieldSpan, response_len: int
     return mask
 
 
+def _content_token_mask(tokenizer, text: str, span: FieldSpan, response_len: int) -> torch.Tensor:
+    if not span.text:
+        return torch.zeros(response_len, dtype=torch.float32)
+    content_start = text.find(span.text, span.start, span.end)
+    if content_start < 0:
+        return torch.zeros(response_len, dtype=torch.float32)
+    content_span = FieldSpan(
+        name=span.name,
+        start=content_start,
+        end=content_start + len(span.text),
+        text=span.text,
+        macro_index=span.macro_index,
+    )
+    return _char_to_token_mask(tokenizer, text, content_span, response_len)
+
+
 def build_cav_masks(
     tokenizer,
     response_text: str,
@@ -38,6 +55,7 @@ def build_cav_masks(
 ) -> CAVMaskResult:
     parsed = parse_completion(response_text, set(allowed_budgets), tokenizer=tokenizer)
     budget_mask = torch.zeros(response_len, dtype=torch.float32)
+    reason_mask = torch.zeros(response_len, dtype=torch.float32)
     executor_mask = torch.zeros(response_len, dtype=torch.float32)
     macro_ids = torch.full((response_len,), -1, dtype=torch.long)
     budget_values = torch.zeros(response_len, dtype=torch.float32)
@@ -46,7 +64,10 @@ def build_cav_masks(
         field_mask = _char_to_token_mask(tokenizer, response_text, field, response_len)
         if field.name == "budget":
             budget_mask += field_mask
-        elif field.name in {"reason", "answer"}:
+        elif field.name == "reason":
+            reason_mask += _content_token_mask(tokenizer, response_text, field, response_len)
+            executor_mask += field_mask
+        elif field.name == "answer":
             executor_mask += field_mask
         if field.macro_index is not None:
             macro_ids[field_mask.bool()] = int(field.macro_index)
@@ -59,6 +80,7 @@ def build_cav_masks(
 
     return CAVMaskResult(
         budget_mask=budget_mask.clamp_max(1.0),
+        reason_mask=reason_mask.clamp_max(1.0),
         executor_mask=executor_mask.clamp_max(1.0),
         macro_ids=macro_ids,
         budget_values=budget_values,
@@ -69,4 +91,3 @@ def build_cav_masks(
         has_stop=parsed.has_stop,
         errors=parsed.errors,
     )
-

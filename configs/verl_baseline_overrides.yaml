@@ -1,0 +1,16 @@
+# Plain PPO baseline overrides (outcome reward, standard GAE, one-shot CoT).
+
+baseline:
+  correct_reward: 1.0
+  wrong_reward: 0.0
+  format_score: 0.0
+  extract_method: flexible
+
+cav:
+  hierarchical_rollout: false
+
+algorithm:
+  adv_estimator: gae
+  gamma: 1.0
+  lam: 0.95
+  use_kl_in_reward: false
