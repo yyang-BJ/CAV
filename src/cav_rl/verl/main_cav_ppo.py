@@ -11,7 +11,7 @@ from cav_rl.lambda_dual import DualLambdaConfig, LambdaController
 from cav_rl.verl.advantage import patch_ray_trainer_compute_advantage, register_cav_advantage
 from cav_rl.verl.metrics import patch_compute_data_metrics, patch_ray_trainer_validate
 from cav_rl.verl.policy_loss import patch_verl_policy_loss
-from cav_rl.verl.reward import CAVRewardConfig, CAVRewardManager, CAVValidationRewardManager
+from cav_rl.verl.reward1 import CAVRewardConfig, CAVRewardManager, CAVValidationRewardManager
 from cav_rl.verl.sampling_patch import apply_vllm_sampling_patch, get_cav_actor_rollout_cls
 from cav_rl.verl.single_turn import patch_ray_trainer_single_turn
 
@@ -230,20 +230,36 @@ class CAVTaskRunner:
             val_dataset = create_rl_dataset(config.data.val_files, config.data, tokenizer, processor)
         train_sampler = create_rl_sampler(config.data, train_dataset)
 
-        trainer = RayPPOTrainer(
-            config=config,
-            tokenizer=tokenizer,
-            processor=processor,
-            role_worker_mapping=role_worker_mapping,
-            resource_pool_manager=resource_pool_manager,
-            ray_worker_group_cls=ray_worker_group_cls,
-            reward_fn=reward_fn,
-            val_reward_fn=val_reward_fn,
-            train_dataset=train_dataset,
-            val_dataset=val_dataset,
-            collate_fn=collate_fn,
-            train_sampler=train_sampler,
-        )
+        # Older veRL releases reject custom estimators in RayPPOTrainer.__init__
+        # before the driver-side dispatcher can handle them.  Construct as GAE
+        # so veRL enables the critic and validates the PPO configuration, then
+        # restore CAV's estimator before training starts.
+        use_cav_advantage = str(config.algorithm.adv_estimator) == "cav_gae"
+        if use_cav_advantage:
+            try:
+                from verl.trainer.ppo.core_algos import AdvantageEstimator
+            except ImportError:
+                from verl.trainer.ppo.ray_trainer import AdvantageEstimator
+
+            config.algorithm.adv_estimator = AdvantageEstimator.GAE
+        try:
+            trainer = RayPPOTrainer(
+                config=config,
+                tokenizer=tokenizer,
+                processor=processor,
+                role_worker_mapping=role_worker_mapping,
+                resource_pool_manager=resource_pool_manager,
+                ray_worker_group_cls=ray_worker_group_cls,
+                reward_fn=reward_fn,
+                val_reward_fn=val_reward_fn,
+                train_dataset=train_dataset,
+                val_dataset=val_dataset,
+                collate_fn=collate_fn,
+                train_sampler=train_sampler,
+            )
+        finally:
+            if use_cav_advantage:
+                config.algorithm.adv_estimator = "cav_gae"
         torch.set_float32_matmul_precision("high")
         trainer.lambda_controller = lambda_controller
         trainer.init_workers()

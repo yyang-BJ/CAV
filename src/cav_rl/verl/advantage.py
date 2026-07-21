@@ -143,7 +143,16 @@ def _token_level_fallback(
 
 
 def register_cav_advantage() -> None:
-    from verl.trainer.ppo.core_algos import register_adv_est
+    """Register CAV with veRL versions that expose an estimator registry.
+
+    Older veRL revisions do not provide ``register_adv_est``.  They are still
+    supported because :func:`patch_ray_trainer_compute_advantage` dispatches
+    ``cav_gae`` directly before veRL's built-in estimator dispatcher runs.
+    """
+    try:
+        from verl.trainer.ppo.core_algos import register_adv_est
+    except ImportError:
+        return
 
     register_adv_est("cav_gae")(compute_cav_gae_advantage_return)
 
