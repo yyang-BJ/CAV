@@ -141,7 +141,6 @@ python3 -m cav_rl.verl.main_cav_ppo \
     reward.reward_manager.source=importlib \
     reward.reward_manager.name=CAVVeRLRewardManager \
     reward.reward_manager.module.path=cav_rl.verl.reward \
-    early_cut=false \
     +trunc_strength=0 \
     trainer.project_name="${project_name}" \
     trainer.experiment_name="${experiment_name}" \
