@@ -134,8 +134,8 @@ python3 -m cav_rl.verl.main_cav_ppo \
     critic.optim.lr=1e-5 \
     critic.optim.lr_warmup_steps_ratio=0.015 \
     critic.use_dynamic_bsz="${USE_DYNAMIC_BSZ}" \
-    critic.model.fsdp_config.param_offload="${PARAM_OFFLOAD:-false}" \
-    critic.model.fsdp_config.optimizer_offload="${OPTIMIZER_OFFLOAD:-false}" \
+    # critic.model.fsdp_config.param_offload="${PARAM_OFFLOAD:-false}" \
+    # critic.model.fsdp_config.optimizer_offload="${OPTIMIZER_OFFLOAD:-false}" \
     algorithm.adv_estimator=cav_gae \
     algorithm.gamma=1.0 \
     algorithm.lam=0.95 \
