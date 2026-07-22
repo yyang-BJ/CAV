@@ -91,18 +91,16 @@ class CAVTaskRunner:
             assert config.critic.strategy in {"fsdp", "fsdp2"}
 
             from verl.single_controller.ray import RayWorkerGroup
-            from verl.workers.engine_workers import AsyncActorRolloutRefWorker, CriticWorker
+            from verl.workers.engine_workers import ActorRolloutRefWorker
 
-            actor_rollout_cls = (
-                AsyncActorRolloutRefWorker
-                if config.actor_rollout_ref.rollout.get("mode", "sync") == "async"
-                else get_cav_actor_rollout_cls()
-            )
+            actor_rollout_cls = get_cav_actor_rollout_cls()
+
             ray_worker_group_cls = RayWorkerGroup
         elif config.actor_rollout_ref.actor.strategy == "megatron":
             assert config.actor_rollout_ref.actor.strategy == config.critic.strategy
+
             from verl.single_controller.ray.megatron import NVMegatronRayWorkerGroup
-            from verl.workers.engine_workers import ActorRolloutRefWorker, AsyncActorRolloutRefWorker, CriticWorker
+            from verl.workers.engine_workers import ActorRolloutRefWorker
 
             actor_rollout_cls = (
                 AsyncActorRolloutRefWorker
