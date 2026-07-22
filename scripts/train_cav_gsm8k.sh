@@ -27,7 +27,7 @@ PY
 )"
 fi
 
-DATA_DIR="${DATA_DIR:-/home/dataset-assist-0/ZX/dataset/gsm8k_cav}"
+DATA_DIR="${DATA_DIR:-${PROJECT_ROOT}/data/gsm8k}"
 TRAIN_FILE="${TRAIN_FILE:-${DATA_DIR}/train.parquet}"
 VAL_FILE="${VAL_FILE:-${DATA_DIR}/test.parquet}"
 DATA_NAME="${DATA_NAME:-GSM8K-CAV}"
@@ -35,6 +35,7 @@ BASE_MODEL="${BASE_MODEL:-${MODEL_PATH:-${PROJECT_ROOT}/outputs/sft-qwen2.5-3b-c
 OUTPUT_ROOT="${OUTPUT_ROOT:-${PROJECT_ROOT}/outputs}"
 NUM_GPUS="${NUM_GPUS:-2}"
 USE_DYNAMIC_BSZ="${USE_DYNAMIC_BSZ:-true}"
+
 # Align schedule with T3 MovieRec (2xA100 Qwen2.5-3B). Keep train batch at 64 by
 # default: CAV hierarchical rollout does multiple vLLM calls per step, so 128
 # (T3 one-shot) is riskier here. Override TRAIN_BATCH_SIZE=128 if memory allows.
@@ -42,26 +43,26 @@ USE_DYNAMIC_BSZ="${USE_DYNAMIC_BSZ:-true}"
 # Fail fast with a clear message if paths are wrong.
 if [[ ! -f "${TRAIN_FILE}" ]]; then
     echo "[CAV] missing train file: ${TRAIN_FILE}" >&2
-    echo "[CAV] export DATA_DIR to gsm8k_cav parquet dir, e.g. /home/dataset-assist-0/ZX/dataset/gsm8k_cav" >&2
+    echo "[CAV] export DATA_DIR to gsm8k parquet dir, e.g. ${PROJECT_ROOT}/data/gsm8k" >&2
     exit 1
 fi
+
 if [[ ! -d "${BASE_MODEL}" ]]; then
     echo "[CAV] missing model dir: ${BASE_MODEL}" >&2
     echo "[CAV] export BASE_MODEL to merged SFT checkpoint (prefer fmt-v2-merged)" >&2
     exit 1
 fi
 
-# Prefer FlashAttention / vLLM V1; XFORMERS forces V0 fallback on recent vLLM.
 unset VLLM_ATTENTION_BACKEND || true
-# Avoid hard-failing when wandb is not logged in; console logging still works.
+
 export WANDB_MODE="${WANDB_MODE:-offline}"
 export PYTHONUNBUFFERED=1
-# Small /dev/shm on this machine; keep Ray object store modest.
 export RAY_object_store_memory="${RAY_object_store_memory:-1000000000}"
 
 project_name="CAV-GSM8K"
 experiment_name="${EXPERIMENT_NAME:-qwen2.5-3b-cav-ppo}"
 default_local_dir="${OUTPUT_ROOT}/${project_name}/${experiment_name}"
+
 mkdir -p "${default_local_dir}"
 
 python3 -m cav_rl.verl.main_cav_ppo \
