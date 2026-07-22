@@ -113,13 +113,13 @@ class CAVTaskRunner:
 
         role_worker_mapping = {
             Role.ActorRollout: ray.remote(actor_rollout_cls),
-            Role.Critic: ray.remote(CriticWorker),
+            # Role.Critic: ray.remote(CriticWorker),
         }
         global_pool_id = "global_pool"
         resource_pool_spec = {global_pool_id: [config.trainer.n_gpus_per_node] * config.trainer.nnodes}
         mapping = {
             Role.ActorRollout: global_pool_id,
-            Role.Critic: global_pool_id,
+            # Role.Critic: global_pool_id,
         }
 
         if config.algorithm.use_kl_in_reward or config.actor_rollout_ref.actor.use_kl_loss:
