@@ -195,12 +195,12 @@ class CAVTaskRunner:
         }
         valid_fields = {f.name for f in _dc.fields(CAVRewardConfig)}
         reward_cfg = CAVRewardConfig(**{k: v for k, v in reward_cfg_kwargs.items() if k in valid_fields})
-        reward_fn = CAVRewardManager(tokenizer=tokenizer, allowed_budgets=allowed_budgets, reward_config=reward_cfg)
-        val_reward_fn = CAVValidationRewardManager(
-            tokenizer=tokenizer,
-            allowed_budgets=allowed_budgets,
-            reward_config=reward_cfg,
-        )
+        # reward_fn = CAVRewardManager(tokenizer=tokenizer, allowed_budgets=allowed_budgets, reward_config=reward_cfg)
+        # val_reward_fn = CAVValidationRewardManager(
+        #     tokenizer=tokenizer,
+        #     allowed_budgets=allowed_budgets,
+        #     reward_config=reward_cfg,
+        # )
         print(
             "[CAV] dual schedule: "
             f"B_start={dual_cfg.b_start} B_final={dual_cfg.target_expected_tokens} "

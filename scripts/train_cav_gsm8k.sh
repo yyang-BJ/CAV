@@ -140,6 +140,9 @@ python3 -m cav_rl.verl.main_cav_ppo \
     algorithm.gamma=1.0 \
     algorithm.lam=0.95 \
     algorithm.use_kl_in_reward=false \
+    +reward.reward_manager.source=importlib \
+    +reward.reward_manager.name=CAVVeRLRewardManager \
+    +reward.reward_manager.module.path=cav_rl.verl.reward \
     early_cut=false \
     +trunc_strength=0 \
     trainer.project_name="${project_name}" \

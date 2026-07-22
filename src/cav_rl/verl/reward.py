@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 import re
-
+import dataclasses
 import numpy as np
 import torch
 
@@ -230,7 +230,44 @@ class CAVRewardManager:
         data.non_tensor_batch["cav_lambda_c"] = np.full(len(data), self.reward_config.lambda_c, dtype=np.float32)
         return reward_tensor, np.array(final_rewards, dtype=np.float32)
 
+class CAVVeRLRewardManager(CAVRewardManager):
+    """Adapter for newer veRL reward manager API."""
 
+    def __init__(
+        self,
+        config,
+        tokenizer,
+        compute_score=None,
+        **kwargs,
+    ):
+        allowed_budgets = list(
+            config.cav.get(
+                "budget_actions",
+                [0, 16, 32, 64, 128],
+            )
+        )
+
+        reward_cfg_kwargs = {}
+        if "reward_config" in kwargs:
+            reward_cfg_kwargs = kwargs["reward_config"]
+
+        valid_fields = {
+            f.name for f in dataclasses.fields(CAVRewardConfig)
+        }
+
+        reward_cfg = CAVRewardConfig(
+            **{
+                k: v
+                for k, v in reward_cfg_kwargs.items()
+                if k in valid_fields
+            }
+        )
+
+        super().__init__(
+            tokenizer=tokenizer,
+            allowed_budgets=allowed_budgets,
+            reward_config=reward_cfg,
+        )
 class CAVValidationRewardManager(CAVRewardManager):
     """Validation reward manager that also aggregates effectiveness/efficiency stats."""
 
