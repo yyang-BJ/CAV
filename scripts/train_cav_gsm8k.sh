@@ -118,6 +118,7 @@ python3 -m cav_rl.verl.main_cav_ppo \
     actor_rollout_ref.rollout.temperature="${ROLLOUT_TEMPERATURE:-0.3}" \
     actor_rollout_ref.rollout.top_p="${ROLLOUT_TOP_P:-0.95}" \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
+    ++actor_rollout_ref.rollout.n_gpus_per_node=1 \
     actor_rollout_ref.rollout.free_cache_engine="${FREE_CACHE_ENGINE:-true}" \
     actor_rollout_ref.rollout.gpu_memory_utilization="${GPU_MEMORY_UTILIZATION:-0.45}" \
     actor_rollout_ref.rollout.max_model_len=2048 \
@@ -150,6 +151,8 @@ python3 -m cav_rl.verl.main_cav_ppo \
     trainer.logger='["console","wandb"]' \
     ++trainer.n_gpus_per_node=1 \
     trainer.nnodes=1 \
+    ++actor_rollout_ref.rollout.n_gpus_per_node=1 \
+    ++critic.n_gpus_per_node=1 \
     trainer.val_before_train=false \
     trainer.test_freq="${TEST_FREQ:-6}" \
     trainer.save_freq="${SAVE_FREQ:-50}" \
