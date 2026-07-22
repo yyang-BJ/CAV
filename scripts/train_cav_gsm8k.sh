@@ -118,7 +118,6 @@ python3 -m cav_rl.verl.main_cav_ppo \
     actor_rollout_ref.rollout.temperature="${ROLLOUT_TEMPERATURE:-0.3}" \
     actor_rollout_ref.rollout.top_p="${ROLLOUT_TOP_P:-0.95}" \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
-    actor_rollout_ref.rollout.n_gpus_per_node=1 \
     actor_rollout_ref.rollout.free_cache_engine="${FREE_CACHE_ENGINE:-true}" \
     actor_rollout_ref.rollout.gpu_memory_utilization="${GPU_MEMORY_UTILIZATION:-0.45}" \
     actor_rollout_ref.rollout.max_model_len=2048 \
@@ -135,8 +134,6 @@ python3 -m cav_rl.verl.main_cav_ppo \
     critic.optim.lr=1e-5 \
     critic.optim.lr_warmup_steps_ratio=0.015 \
     critic.use_dynamic_bsz="${USE_DYNAMIC_BSZ}" \
-    # critic.model.fsdp_config.param_offload="${PARAM_OFFLOAD:-false}" \
-    # critic.model.fsdp_config.optimizer_offload="${OPTIMIZER_OFFLOAD:-false}" \
     algorithm.adv_estimator=cav_gae \
     algorithm.gamma=1.0 \
     algorithm.lam=0.95 \
@@ -158,8 +155,6 @@ python3 -m cav_rl.verl.main_cav_ppo \
     ++distillation.n_gpus_per_node=1 \
     trainer.nnodes=1 \
     trainer.val_before_train=false \
-    critic.n_gpus_per_node=1 \
-
     trainer.test_freq="${TEST_FREQ:-6}" \
     trainer.save_freq="${SAVE_FREQ:-50}" \
     trainer.total_training_steps="${TOTAL_TRAINING_STEPS:-100}" \
