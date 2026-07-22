@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
-# Use the current conda environment for CAV.
-# The environment should already include torch, transformers, datasets, ray, verl, vllm.
+# Use the self-contained CAV virtual environment.
+# The environment should include torch, transformers, datasets, ray, verl, vllm.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-if [[ -z "${CONDA_PREFIX:-}" ]]; then
-  echo "[CAV] No active conda environment detected." >&2
+if [[ -z "${VIRTUAL_ENV:-}" && -z "${CONDA_PREFIX:-}" ]]; then
+  echo "[CAV] No active Python environment detected." >&2
   echo "Activate the CAV environment first:" >&2
-  echo "  conda activate CAV" >&2
+  echo "  source .venv/bin/activate" >&2
   exit 1
 fi
 
 PYTHONPATH_PARTS=()
 
 # IMPORTANT:
-# CAV expects the older T3 veRL API (CriticWorker, fsdp_workers, etc.)
-# Put T3 veRL before everything else.
-T3_VERL_ROOT="${T3_VERL_ROOT:-${PROJECT_ROOT}/../T3/verl}"
+# Always use the veRL version bundled with this CAV repository.
+# Avoid accidentally importing another project's/system verl.
+CAV_VERL_ROOT="${PROJECT_ROOT}/third_party/verl"
 
-if [[ -f "${T3_VERL_ROOT}/verl/__init__.py" ]]; then
-  PYTHONPATH_PARTS+=("${T3_VERL_ROOT}")
+if [[ -f "${CAV_VERL_ROOT}/verl/__init__.py" ]]; then
+  PYTHONPATH_PARTS+=("${CAV_VERL_ROOT}")
 else
-  echo "[CAV] WARNING: T3 veRL not found at ${T3_VERL_ROOT}" >&2
+  echo "[CAV] WARNING: local veRL not found at ${CAV_VERL_ROOT}" >&2
 fi
 
-# Then CAV source
+# CAV source
 PYTHONPATH_PARTS+=("${PROJECT_ROOT}/src")
 
-# Preserve existing paths last
+# Preserve existing PYTHONPATH last
 if [[ -n "${PYTHONPATH:-}" ]]; then
   PYTHONPATH_PARTS+=("${PYTHONPATH}")
 fi
@@ -39,14 +39,21 @@ export PYTHONPATH="$(IFS=:; echo "${PYTHONPATH_PARTS[*]}")"
 
 cd "${PROJECT_ROOT}"
 
-echo "[CAV] using conda environment: ${CONDA_PREFIX}"
+echo "[CAV] python environment:"
+if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+  echo "  venv: ${VIRTUAL_ENV}"
+fi
+if [[ -n "${CONDA_PREFIX:-}" ]]; then
+  echo "  conda: ${CONDA_PREFIX}"
+fi
+
 echo "[CAV] python: $(which python)"
 echo "[CAV] PYTHONPATH=${PYTHONPATH}"
 
 python - <<'PY'
 import sys
-import cav_rl
 import torch
+import cav_rl
 import verl
 
 print(f"cav_rl={getattr(cav_rl, '__version__', '?')} python={sys.version.split()[0]}")
