@@ -1,4 +1,4 @@
-model_name_or_path: /home/dataset-assist-0/ZX/models/Qwen2.5-3B-Instruct
+model_name_or_path: /root/models/Qwen2.5-3B-Instruct
 dataset_name: openai/gsm8k
 dataset_config: main
 # Fresh output — previous fmt run was corrupted by left-padding label misalignment.
