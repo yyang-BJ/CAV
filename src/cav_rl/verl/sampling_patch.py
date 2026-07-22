@@ -34,7 +34,7 @@ def get_cav_actor_rollout_cls():
     if _CAV_ACTOR_CLS is not None:
         return _CAV_ACTOR_CLS
 
-    from verl.workers.fsdp_workers import ActorRolloutRefWorker
+    from verl.workers.engine_workers import ActorRolloutRefWorker
 
     apply_vllm_sampling_patch()
 
