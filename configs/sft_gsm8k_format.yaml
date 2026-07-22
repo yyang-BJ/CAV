@@ -11,8 +11,8 @@ max_train_samples:
 max_eval_samples: 128
 
 # Fast but safe: right-pad + batch>1 now aligned.
-train_batch_size: 8
-gradient_accumulation_steps: 2
+train_batch_size: 2
+gradient_accumulation_steps: 8
 num_train_epochs: 1
 learning_rate: 2.0e-5
 weight_decay: 0.0
@@ -20,7 +20,7 @@ warmup_ratio: 0.03
 logging_steps: 10
 save_steps: 200
 bf16: true
-gradient_checkpointing: false
+gradient_checkpointing: true
 
 budget_actions: [0, 16, 32, 64, 128]
 sft_reason_budget: 64
