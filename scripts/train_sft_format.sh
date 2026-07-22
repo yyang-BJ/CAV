@@ -11,7 +11,7 @@ export PYTHONPATH="${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
 CONFIG="${CONFIG:-configs/sft_gsm8k_format.yaml}"
 ADAPTER_DIR="${ADAPTER_DIR:-${PROJECT_ROOT}/outputs/sft-qwen2.5-3b-cav-gsm8k-fmt-v2}"
 MERGED_DIR="${MERGED_DIR:-${PROJECT_ROOT}/outputs/sft-qwen2.5-3b-cav-gsm8k-fmt-v2-merged}"
-BASE_MODEL="${BASE_MODEL:-/home/dataset-assist-0/ZX/models/Qwen2.5-3B-Instruct}"
+BASE_MODEL="${BASE_MODEL:-/root/models/Qwen2.5-3B-Instruct}"
 
 echo "[CAV-SFT] train with ${CONFIG}"
 # Single GPU: DataParallel with tiny batches was ~60s/step.
