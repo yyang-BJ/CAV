@@ -149,10 +149,17 @@ python3 -m cav_rl.verl.main_cav_ppo \
     trainer.project_name="${project_name}" \
     trainer.experiment_name="${experiment_name}" \
     trainer.logger='["console","wandb"]' \
-    trainer.n_gpus_per_node=1 \
+    ++trainer.n_gpus_per_node=1 \
+    ++actor_rollout_ref.actor.n_gpus_per_node=1 \
+    ++actor_rollout_ref.ref.n_gpus_per_node=1 \
+    ++actor_rollout_ref.rollout.n_gpus_per_node=1 \
+    ++critic.n_gpus_per_node=1 \
+    ++reward_model.n_gpus_per_node=1 \
+    ++distillation.n_gpus_per_node=1 \
     trainer.nnodes=1 \
-    critic.n_gpus_per_node=1 \
     trainer.val_before_train=false \
+    critic.n_gpus_per_node=1 \
+
     trainer.test_freq="${TEST_FREQ:-6}" \
     trainer.save_freq="${SAVE_FREQ:-50}" \
     trainer.total_training_steps="${TOTAL_TRAINING_STEPS:-100}" \
