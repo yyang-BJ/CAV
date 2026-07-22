@@ -59,14 +59,11 @@ class CAVTaskRunner:
         from pprint import pprint
 
         import torch
-        
+
         from verl.trainer.ppo.ray_trainer import RayPPOTrainer, ResourcePoolManager, Role
+        from verl.trainer.ppo.utils import create_rl_dataset, create_rl_sampler
         from verl.utils import hf_tokenizer
-        from verl.utils.dataset.rl_dataset import (
-            collate_fn,
-            create_rl_dataset,
-            create_rl_sampler,
-        )
+        from verl.utils.dataset.rl_dataset import collate_fn
         from verl.utils.fs import copy_to_local
 
         print(f"CAVTaskRunner hostname: {socket.gethostname()}, PID: {os.getpid()}")
