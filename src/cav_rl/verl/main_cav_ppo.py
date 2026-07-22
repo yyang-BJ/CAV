@@ -92,49 +92,52 @@ class CAVTaskRunner:
 
             from verl.single_controller.ray import RayWorkerGroup
             from verl.workers.engine_workers import ActorRolloutRefWorker
+            from verl.workers.fsdp_workers import CriticWorker
 
             actor_rollout_cls = get_cav_actor_rollout_cls()
 
             ray_worker_group_cls = RayWorkerGroup
+
         elif config.actor_rollout_ref.actor.strategy == "megatron":
             assert config.actor_rollout_ref.actor.strategy == config.critic.strategy
 
             from verl.single_controller.ray.megatron import NVMegatronRayWorkerGroup
             from verl.workers.engine_workers import ActorRolloutRefWorker
+            from verl.workers.megatron_workers import CriticWorker
 
             actor_rollout_cls = (
                 AsyncActorRolloutRefWorker
                 if config.actor_rollout_ref.rollout.get("mode", "sync") == "async"
                 else ActorRolloutRefWorker
             )
+
             ray_worker_group_cls = NVMegatronRayWorkerGroup
+
         else:
-            raise NotImplementedError(f"Unsupported actor strategy: {config.actor_rollout_ref.actor.strategy}")
+            raise NotImplementedError(
+                f"Unsupported actor strategy: {config.actor_rollout_ref.actor.strategy}"
+            )
+
 
         role_worker_mapping = {
             Role.ActorRollout: ray.remote(actor_rollout_cls),
-            # Role.Critic: ray.remote(CriticWorker),
+            Role.Critic: ray.remote(CriticWorker),
         }
+
+
         global_pool_id = "global_pool"
-        resource_pool_spec = {global_pool_id: [config.trainer.n_gpus_per_node] * config.trainer.nnodes}
+
+        resource_pool_spec = {
+            global_pool_id: [
+                config.trainer.n_gpus_per_node
+            ] * config.trainer.nnodes
+        }
+
+
         mapping = {
             Role.ActorRollout: global_pool_id,
-            # Role.Critic: global_pool_id,
+            Role.Critic: global_pool_id,
         }
-
-        if config.algorithm.use_kl_in_reward or config.actor_rollout_ref.actor.use_kl_loss:
-            role_worker_mapping[Role.RefPolicy] = ray.remote(actor_rollout_cls)
-            mapping[Role.RefPolicy] = global_pool_id
-
-        if config.reward_model.enable:
-            if config.reward_model.strategy in {"fsdp", "fsdp2"}:
-                from verl.workers.fsdp_workers import RewardModelWorker
-            elif config.reward_model.strategy == "megatron":
-                from verl.workers.megatron_workers import RewardModelWorker
-            else:
-                raise NotImplementedError(f"Unsupported reward model strategy: {config.reward_model.strategy}")
-            role_worker_mapping[Role.RewardModel] = ray.remote(RewardModelWorker)
-            mapping[Role.RewardModel] = global_pool_id
 
         cav_cfg = config.get("cav", {})
         allowed_budgets = list(cav_cfg.get("budget_actions", [0, 16, 32, 64, 128]))
