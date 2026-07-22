@@ -92,7 +92,7 @@ class CAVTaskRunner:
 
             from verl.single_controller.ray import RayWorkerGroup
             from verl.workers.engine_workers import ActorRolloutRefWorker
-            # from verl.workers.fsdp_workers import CriticWorker
+            from verl.workers.fsdp_workers import CriticWorker
 
             actor_rollout_cls = get_cav_actor_rollout_cls()
 
@@ -121,7 +121,7 @@ class CAVTaskRunner:
 
         role_worker_mapping = {
             Role.ActorRollout: ray.remote(actor_rollout_cls),
-            # Role.Critic: ray.remote(CriticWorker),
+            Role.Critic: ray.remote(CriticWorker),
         }
 
 
@@ -136,9 +136,8 @@ class CAVTaskRunner:
 
         mapping = {
             Role.ActorRollout: global_pool_id,
-            # Role.Critic: global_pool_id,
+            Role.Critic: global_pool_id,
         }
-
         cav_cfg = config.get("cav", {})
         allowed_budgets = list(cav_cfg.get("budget_actions", [0, 16, 32, 64, 128]))
         initial_lambda = float(cav_cfg.get("lambda_c", 0.0005))
